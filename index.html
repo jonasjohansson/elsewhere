@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#2e4439" />
+  <meta name="description" content="Personal offline guide to Elsewhere '26 — what, where, when." />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="WWW '26" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="style.css" />
+  <title>WWW '26 — What Where When</title>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-row">
+      <h1>WWW <span>'26</span></h1>
+      <button id="exportBtn" class="ghost-btn" title="Export favourites + top picks to calendar">📅 Export</button>
+    </div>
+    <div id="filters" class="filters">
+      <input id="search" type="search" placeholder="Search events, camps…" autocomplete="off" />
+      <div id="dayPills" class="pills" role="tablist" aria-label="Day"></div>
+      <div id="catChips" class="chips" aria-label="Categories"></div>
+      <div class="toggles">
+        <label class="toggle"><input type="checkbox" id="forYouOnly" /> ⭐ For You only</label>
+        <label class="toggle"><input type="checkbox" id="hideAdult" /> 🙈 Hide adult</label>
+      </div>
+    </div>
+  </header>
+
+  <main id="list" class="list"><p class="loading">Loading events…</p></main>
+
+  <nav class="tabbar">
+    <button data-view="foryou" class="tab active">⭐<span>For You</span></button>
+    <button data-view="schedule" class="tab">🗓<span>Schedule</span></button>
+    <button data-view="favs" class="tab">❤️<span>Favs</span></button>
+    <button data-view="camps" class="tab">🏕<span>Camps</span></button>
+  </nav>
+
+  <script src="ics.js"></script>
+  <script src="app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("sw.js").catch(function () {});
+      });
+    }
+  </script>
+</body>
+</html>

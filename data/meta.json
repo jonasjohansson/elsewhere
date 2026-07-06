@@ -1,0 +1,22 @@
+{
+  "source": "https://whatwherewhen.nobodies.team/assets/index-B1HbHiu1.js",
+  "extractedCount": 698,
+  "dayDates": {
+    "Tue": "2026-07-07",
+    "Wed": "2026-07-08",
+    "Thu": "2026-07-09",
+    "Fri": "2026-07-10",
+    "Sat": "2026-07-11",
+    "Sun": "2026-07-12"
+  },
+  "categories": {
+    "heal": 64,
+    "chill": 39,
+    "adult": 175,
+    "work": 250,
+    "other": 50,
+    "food": 31,
+    "party": 86,
+    "kids": 3
+  }
+}

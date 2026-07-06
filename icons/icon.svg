@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#2e4439"/>
+  <circle cx="256" cy="188" r="70" fill="none" stroke="#e8dfc9" stroke-width="14"/>
+  <circle cx="256" cy="188" r="10" fill="#c98a1a"/>
+  <g stroke="#c98a1a" stroke-width="12" stroke-linecap="round">
+    <line x1="256" y1="92" x2="256" y2="70"/>
+    <line x1="256" y1="284" x2="256" y2="306"/>
+    <line x1="160" y1="188" x2="138" y2="188"/>
+    <line x1="352" y1="188" x2="374" y2="188"/>
+    <line x1="188" y1="120" x2="172" y2="104"/>
+    <line x1="324" y1="256" x2="340" y2="272"/>
+    <line x1="324" y1="120" x2="340" y2="104"/>
+    <line x1="188" y1="256" x2="172" y2="272"/>
+  </g>
+  <text x="256" y="410" font-family="Helvetica, Arial, sans-serif" font-size="132" font-weight="800"
+        fill="#e8dfc9" text-anchor="middle" letter-spacing="4">WWW</text>
+  <text x="256" y="462" font-family="Helvetica, Arial, sans-serif" font-size="46" font-weight="600"
+        fill="#d8ccae" text-anchor="middle" letter-spacing="8">'26</text>
+</svg>
