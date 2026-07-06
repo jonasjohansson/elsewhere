@@ -4,8 +4,8 @@
   "description": "Personal offline guide to Elsewhere '26 — what, where, when.",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#e8dfc9",
-  "theme_color": "#2e4439",
+  "background_color": "#faf5ee",
+  "theme_color": "#f2ebe0",
   "lang": "en",
   "scope": "./",
   "icons": [

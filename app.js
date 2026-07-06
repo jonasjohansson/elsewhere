@@ -112,7 +112,7 @@
 
   function catTag(cat) {
     var c = CATS[cat] || CATS.other;
-    return '<span class="tag" style="background:' + c.color + '">' + c.emoji + " " + c.label + "</span>";
+    return '<span class="tag" style="--tagc:' + c.color + '"><span class="tdot"></span>' + c.label + "</span>";
   }
 
   function cardHTML(e) {
@@ -120,23 +120,23 @@
     var open = state.open.has(e.id);
     var daysTxt = e.days.length === 6 ? "Every day" : e.days.join(" · ");
     var reason = e.reason
-      ? '<div class="reason">⭐ ' + escapeHtml(e.reason) + "</div>" : "";
-    var scoreBadge = (e.score >= 65)
-      ? '<span class="score-badge">' + e.score + "</span>" : "";
-    var heartLabel = (fav ? "Remove favourite: " : "Add favourite: ") + e.title;
+      ? '<div class="reason"><span class="fystar">★</span> ' + escapeHtml(e.reason) + "</div>" : "";
+    var fyStar = e.forYou ? '<span class="fystar" title="Suggested for you">★</span>' : "";
+    var heartLabel = (fav ? "Remove from liked: " : "Add to liked: ") + e.title;
     return (
-      '<article class="card' + (open ? " open" : "") + '" data-id="' + e.id + '"' +
+      '<article class="card' + (open ? " open" : "") + (e.forYou ? " foryou" : "") + '" data-id="' + e.id + '"' +
         ' tabindex="0" aria-expanded="' + (open ? "true" : "false") + '">' +
         '<div class="card-top">' +
-          '<h3 class="card-title">' + escapeHtml(e.title) + "</h3>" +
+          '<h3 class="card-title">' + fyStar + escapeHtml(e.title) + "</h3>" +
           '<button class="heart' + (fav ? " on" : "") + '" data-fav="' + e.id +
-            '" aria-pressed="' + (fav ? "true" : "false") + '" aria-label="' + escapeHtml(heartLabel) + '">❤</button>' +
+            '" aria-pressed="' + (fav ? "true" : "false") + '" aria-label="' + escapeHtml(heartLabel) + '">' +
+            (fav ? "♥" : "♡") + "</button>" +
         "</div>" +
         '<div class="meta">' +
           '<span>🕑 ' + timeRange(e) + (durLabel(e.dur) ? " · " + durLabel(e.dur) : "") + "</span>" +
           (e.camp ? '<span class="camp">🏕 ' + escapeHtml(e.camp) + "</span>" : "") +
           (e.loc ? "<span>📍 " + escapeHtml(e.loc) + "</span>" : "") +
-          catTag(e.cat) + scoreBadge +
+          catTag(e.cat) +
         "</div>" +
         '<div class="days-line">📅 ' + daysTxt + "</div>" +
         reason +
@@ -418,6 +418,7 @@
         var nowFav = state.favs.has(id);
         favBtn.classList.toggle("on", nowFav);
         favBtn.setAttribute("aria-pressed", nowFav ? "true" : "false");
+        favBtn.textContent = nowFav ? "♥" : "♡";
         if (state.view === "favs" || state.likedOnly) render();
         return;
       }
@@ -475,6 +476,7 @@
       var nowFav = state.favs.has(id);
       favBtn.classList.toggle("on", nowFav);
       favBtn.setAttribute("aria-pressed", nowFav ? "true" : "false");
+      favBtn.textContent = nowFav ? "♥" : "♡";
       render();
     });
     document.addEventListener("keydown", function (ev) {
