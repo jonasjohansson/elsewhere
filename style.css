@@ -219,6 +219,26 @@ body {
   width: 40px; height: 40px; cursor: pointer;
 }
 
+/* ---------- Map view ---------- */
+.list.map-mode { max-width: none; padding: 0; }
+.map-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px; background: var(--bg-alt); border-bottom: 1px solid var(--border);
+}
+.map-hint { font-size: 12.5px; color: var(--muted); letter-spacing: 0.02em; }
+.map-zoom { display: flex; gap: 6px; }
+.map-zoom button {
+  width: 36px; height: 36px; border: 1px solid var(--border-strong); background: var(--card);
+  color: var(--text); border-radius: var(--radius-sm); font-size: 18px; line-height: 1; cursor: pointer;
+}
+.map-zoom button:active { border-color: var(--accent); color: var(--accent); }
+.map-scroll { overflow: auto; height: 64vh; height: 64dvh; background: var(--bg); -webkit-overflow-scrolling: touch; }
+.map-inner { min-width: 100%; }
+.map-inner svg { width: 100%; height: auto; display: block; }
+.map-barrio { font-weight: 600 !important; }
+.map-barrio:hover, .map-barrio:focus { fill: var(--accent) !important; }
+@media (min-width: 1000px) { .map-scroll { height: calc(100dvh - var(--tab-h) - 130px); } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

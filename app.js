@@ -35,6 +35,8 @@
     forceList: false,   // desktop: force card list instead of grid
     favs: new Set(),
     open: new Set(),
+    mapSvg: null,       // null = loading, false = failed, string = loaded
+    mapZoom: 100,
   };
 
   // ---------- persistence ----------
@@ -154,6 +156,16 @@
   function render() {
     var v = state.view;
     var html = "";
+
+    // Map view — the festival "City" map, tap a barrio to filter.
+    if (v === "map") {
+      listEl.className = "list map-mode";
+      listEl.innerHTML = mapHTML();
+      wireMap();
+      var st = document.getElementById("filterStatus");
+      if (st) st.textContent = "Map of the city — tap a barrio to see its events";
+      return;
+    }
 
     // Desktop timetable grid for the Schedule view.
     if (v === "schedule" && gridActive()) {
@@ -364,6 +376,71 @@
     sbt.addEventListener("change", function () { state.sortByTime = sbt.checked; savePrefs(); render(); });
   }
 
+  // ---------- map view ----------
+  function mapHTML() {
+    if (state.mapSvg === null) return '<div class="map-wrap"><p class="loading">Loading map…</p></div>';
+    if (state.mapSvg === false) return '<div class="map-wrap">' + emptyMsg("Map unavailable offline until first load.") + "</div>";
+    return (
+      '<div class="map-wrap">' +
+        '<div class="map-toolbar">' +
+          '<span class="map-hint">🗺 The City · tap a barrio</span>' +
+          '<div class="map-zoom">' +
+            '<button data-mz="out" aria-label="Zoom out">−</button>' +
+            '<button data-mz="in" aria-label="Zoom in">+</button>' +
+          "</div>" +
+        "</div>" +
+        '<div class="map-scroll"><div class="map-inner" style="width:' + state.mapZoom + '%">' +
+          state.mapSvg +
+        "</div></div>" +
+      "</div>"
+    );
+  }
+
+  function wireMap() {
+    var inner = listEl.querySelector(".map-inner");
+    if (!inner) return;
+    // Make barrio labels that match a real camp tappable -> filter to that barrio.
+    var camps = {};
+    state.events.forEach(function (e) { if (e.camp) camps[e.camp] = true; });
+    function gotoBarrio(name) {
+      state.barrio = name;
+      var sel = document.getElementById("barrio");
+      if (sel) sel.value = name;
+      state.view = "schedule"; savePrefs();
+      document.querySelectorAll(".tab").forEach(function (tb) {
+        var on = tb.getAttribute("data-view") === "schedule";
+        tb.classList.toggle("active", on); tb.setAttribute("aria-selected", on ? "true" : "false");
+      });
+      if (typeof syncSortToggle === "function") syncSortToggle();
+      if (typeof syncLayoutToggle === "function") syncLayoutToggle();
+      window.scrollTo(0, 0);
+      render();
+    }
+    inner.querySelectorAll("text").forEach(function (t) {
+      var name = (t.textContent || "").trim();
+      if (!camps[name]) return;
+      t.classList.add("map-barrio");
+      t.style.cursor = "pointer";
+      t.style.pointerEvents = "all";          // whole text box clickable, not just glyphs
+      t.setAttribute("tabindex", "0");
+      t.setAttribute("role", "button");
+      t.setAttribute("aria-label", "See events at " + name);
+      t.addEventListener("click", function () { gotoBarrio(name); });
+      t.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); gotoBarrio(name); }
+      });
+    });
+    // zoom buttons
+    var toolbar = listEl.querySelector(".map-zoom");
+    if (toolbar) toolbar.addEventListener("click", function (ev) {
+      var b = ev.target.closest("[data-mz]"); if (!b) return;
+      var dir = b.getAttribute("data-mz");
+      state.mapZoom = Math.max(100, Math.min(400, state.mapZoom + (dir === "in" ? 60 : -60)));
+      var el = listEl.querySelector(".map-inner");
+      if (el) el.style.width = state.mapZoom + "%";
+    });
+  }
+
   // ---------- barrio dropdown ----------
   function populateBarrios() {
     var sel = document.getElementById("barrio");
@@ -512,6 +589,11 @@
       .catch(function (e) {
         listEl.innerHTML = emptyMsg("Couldn’t load events. " + e.message);
       });
+    // Map SVG loads independently (never masks an events-load error).
+    fetch("map.svg")
+      .then(function (r) { return r.ok ? r.text() : Promise.reject(); })
+      .then(function (svg) { state.mapSvg = svg; if (state.view === "map") render(); })
+      .catch(function () { state.mapSvg = false; if (state.view === "map") render(); });
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);

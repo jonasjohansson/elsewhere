@@ -1,8 +1,8 @@
 /* WWW '26 service worker — precache the app shell + data for full offline use. */
-var CACHE = "www26-v5";
+var CACHE = "www26-v6";
 var ASSETS = [
   "./", "index.html", "style.css", "app.js", "ics.js",
-  "events.json", "manifest.webmanifest", "fonts/Inter-latin.woff2",
+  "events.json", "map.svg", "manifest.webmanifest", "fonts/Inter-latin.woff2",
   "icons/icon.svg", "icons/pwa-192.png", "icons/pwa-512.png",
   "icons/apple-touch-icon.png",
 ];
