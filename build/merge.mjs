@@ -42,12 +42,27 @@ const out = events.map((e) => {
   };
 });
 
-const payload = { meta: { ...meta, scored, total: out.length }, events: out };
+// Drop obvious duplicates: records identical in title+camp+time+dur+days.
+// (Same title/camp but different day or time = a distinct session — kept.)
+const norm = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const dedupKey = (e) => [norm(e.title), norm(e.camp), e.time, e.dur, [...e.days].sort().join(",")].join("|");
+const seen = new Set();
+const deduped = out.filter((e) => {
+  const k = dedupKey(e);
+  if (seen.has(k)) return false;
+  seen.add(k);
+  return true;
+});
+const removed = out.length - deduped.length;
+const scoredFinal = deduped.filter((e) => scoreMap.has(e.id)).length;
+
+const payload = { meta: { ...meta, scored: scoredFinal, total: deduped.length, deduped: removed }, events: deduped };
 writeFileSync(resolve(ROOT, "events.json"), JSON.stringify(payload));
-console.log(`✓ Merged ${out.length} events (${scored} AI-scored) -> events.json`);
+if (removed) console.log(`  removed ${removed} exact duplicate(s)`);
+console.log(`✓ Merged ${deduped.length} events (${scored} AI-scored) -> events.json`);
 if (scored) {
-  const forYou = out.filter((e) => e.forYou).length;
+  const forYou = deduped.filter((e) => e.forYou).length;
   const buckets = { "80+": 0, "65-79": 0, "50-64": 0, "<50": 0 };
-  for (const e of out) buckets[e.score >= 80 ? "80+" : e.score >= 65 ? "65-79" : e.score >= 50 ? "50-64" : "<50"]++;
+  for (const e of deduped) buckets[e.score >= 80 ? "80+" : e.score >= 65 ? "65-79" : e.score >= 50 ? "50-64" : "<50"]++;
   console.log(`  For You: ${forYou}  |  score buckets:`, buckets);
 }

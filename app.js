@@ -26,6 +26,7 @@
     view: "foryou",
     search: "",
     day: null,          // null = all days
+    barrio: "",         // "" = all barrios/camps
     cats: new Set(),    // empty = all categories
     forYouOnly: false,
     likedOnly: false,
@@ -92,6 +93,7 @@
     if (state.hideAdult && e.cat === "adult") return false;
     if (state.forYouOnly && !e.forYou) return false;
     if (state.likedOnly && !state.favs.has(e.id)) return false;
+    if (state.barrio && e.camp !== state.barrio) return false;
     if (state.cats.size && !state.cats.has(e.cat)) return false;
     if (state.day && e.days.indexOf(state.day) < 0) return false;
     if (state.search) {
@@ -237,6 +239,9 @@
     var search = document.getElementById("search");
     search.addEventListener("input", function () { state.search = search.value.trim(); render(); });
 
+    var barrio = document.getElementById("barrio");
+    barrio.addEventListener("change", function () { state.barrio = barrio.value; render(); });
+
     var fyo = document.getElementById("forYouOnly");
     var lo = document.getElementById("likedOnly");
     var ha = document.getElementById("hideAdult");
@@ -247,6 +252,19 @@
     lo.addEventListener("change", function () { state.likedOnly = lo.checked; savePrefs(); render(); });
     ha.addEventListener("change", function () { state.hideAdult = ha.checked; savePrefs(); render(); });
     sbt.addEventListener("change", function () { state.sortByTime = sbt.checked; savePrefs(); render(); });
+  }
+
+  // ---------- barrio dropdown ----------
+  function populateBarrios() {
+    var sel = document.getElementById("barrio");
+    if (!sel) return;
+    var counts = {};
+    state.events.forEach(function (e) { if (e.camp) counts[e.camp] = (counts[e.camp] || 0) + 1; });
+    var names = Object.keys(counts).sort(function (a, b) { return a.localeCompare(b); });
+    var frag = names.map(function (c) {
+      return '<option value="' + escapeHtml(c) + '">🏕 ' + escapeHtml(c) + " (" + counts[c] + ")</option>";
+    }).join("");
+    sel.insertAdjacentHTML("beforeend", frag);
   }
 
   // ---------- tabs ----------
@@ -315,6 +333,7 @@
       .then(function (data) {
         state.events = data.events || [];
         state.meta = data.meta || {};
+        populateBarrios();
         render();
       })
       .catch(function (e) {
