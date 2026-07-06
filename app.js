@@ -28,7 +28,9 @@
     day: null,          // null = all days
     cats: new Set(),    // empty = all categories
     forYouOnly: false,
+    likedOnly: false,
     hideAdult: false,
+    sortByTime: false,
     favs: new Set(),
     open: new Set(),
   };
@@ -42,14 +44,17 @@
     try {
       var p = JSON.parse(localStorage.getItem(LS.prefs) || "{}");
       if (p.forYouOnly) state.forYouOnly = true;
+      if (p.likedOnly) state.likedOnly = true;
       if (p.hideAdult) state.hideAdult = true;
+      if (p.sortByTime) state.sortByTime = true;
       if (p.view) state.view = p.view;
     } catch (e) {}
   }
   function saveFavs() { localStorage.setItem(LS.favs, JSON.stringify([].concat(Array.from(state.favs)))); }
   function savePrefs() {
     localStorage.setItem(LS.prefs, JSON.stringify({
-      forYouOnly: state.forYouOnly, hideAdult: state.hideAdult, view: state.view,
+      forYouOnly: state.forYouOnly, likedOnly: state.likedOnly,
+      hideAdult: state.hideAdult, sortByTime: state.sortByTime, view: state.view,
     }));
   }
 
@@ -71,11 +76,22 @@
     return dur + "m";
   }
   function timeToMin(t) { var p = t.split(":"); return (+p[0]) * 60 + (+p[1]); }
+  function firstDayIdx(e) {
+    var min = 99;
+    e.days.forEach(function (d) { var i = DAY_ORDER.indexOf(d); if (i >= 0 && i < min) min = i; });
+    return min;
+  }
+  function byDayThenTime(a, b) {
+    // If a single day is active, order is purely by time; else group by first day.
+    if (!state.day) { var d = firstDayIdx(a) - firstDayIdx(b); if (d) return d; }
+    return timeToMin(a.time) - timeToMin(b.time) || b.score - a.score;
+  }
 
   // ---------- filtering ----------
   function passesFilters(e) {
     if (state.hideAdult && e.cat === "adult") return false;
     if (state.forYouOnly && !e.forYou) return false;
+    if (state.likedOnly && !state.favs.has(e.id)) return false;
     if (state.cats.size && !state.cats.has(e.cat)) return false;
     if (state.day && e.days.indexOf(state.day) < 0) return false;
     if (state.search) {
@@ -133,7 +149,8 @@
     var items = state.events.filter(passesFilters);
 
     if (v === "foryou") {
-      items.sort(function (a, b) { return b.score - a.score || timeToMin(a.time) - timeToMin(b.time); });
+      if (state.sortByTime) items.sort(byDayThenTime);
+      else items.sort(function (a, b) { return b.score - a.score || timeToMin(a.time) - timeToMin(b.time); });
       html = items.length ? items.map(cardHTML).join("") : emptyMsg("Nothing matches. Loosen the filters.");
     } else if (v === "favs") {
       var favItems = items.filter(function (e) { return state.favs.has(e.id); });
@@ -221,18 +238,28 @@
     search.addEventListener("input", function () { state.search = search.value.trim(); render(); });
 
     var fyo = document.getElementById("forYouOnly");
+    var lo = document.getElementById("likedOnly");
     var ha = document.getElementById("hideAdult");
-    fyo.checked = state.forYouOnly; ha.checked = state.hideAdult;
+    var sbt = document.getElementById("sortByTime");
+    fyo.checked = state.forYouOnly; lo.checked = state.likedOnly;
+    ha.checked = state.hideAdult; sbt.checked = state.sortByTime;
     fyo.addEventListener("change", function () { state.forYouOnly = fyo.checked; savePrefs(); render(); });
+    lo.addEventListener("change", function () { state.likedOnly = lo.checked; savePrefs(); render(); });
     ha.addEventListener("change", function () { state.hideAdult = ha.checked; savePrefs(); render(); });
+    sbt.addEventListener("change", function () { state.sortByTime = sbt.checked; savePrefs(); render(); });
   }
 
   // ---------- tabs ----------
   function buildTabs() {
     var tabs = document.querySelectorAll(".tab");
+    var sortWrap = document.getElementById("sortByTimeWrap");
+    function syncSortToggle() {
+      if (sortWrap) sortWrap.style.display = state.view === "foryou" ? "" : "none";
+    }
     function activate(view) {
       state.view = view; savePrefs();
       tabs.forEach(function (t) { t.classList.toggle("active", t.getAttribute("data-view") === view); });
+      syncSortToggle();
       window.scrollTo(0, 0);
       render();
     }
@@ -241,6 +268,7 @@
       if (t.getAttribute("data-view") === state.view) t.classList.add("active");
       else t.classList.remove("active");
     });
+    syncSortToggle();
   }
 
   // ---------- card interactions (event delegation) ----------
