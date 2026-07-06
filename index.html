@@ -19,9 +19,12 @@
   <header class="topbar">
     <div class="topbar-row">
       <h1>WWW <span>'26</span></h1>
-      <button id="exportBtn" class="ghost-btn" title="Export favourites + top picks to calendar">📅 Export</button>
+      <div class="topbar-actions">
+        <button id="layoutToggle" class="ghost-btn" title="Switch between list and grid" aria-label="Switch between list and grid layout" hidden>▦ Grid</button>
+        <button id="exportBtn" class="ghost-btn" title="Export favourites + top picks to calendar" aria-label="Export favourites and top picks to calendar">📅 Export</button>
+      </div>
     </div>
-    <div id="filters" class="filters">
+    <div id="filters" class="filters" role="search">
       <input id="search" type="search" placeholder="Search events, camps…" autocomplete="off" />
       <select id="barrio" class="barrio-select" aria-label="Filter by barrio / camp">
         <option value="">🏕 All barrios</option>
@@ -37,14 +40,20 @@
     </div>
   </header>
 
-  <main id="list" class="list"><p class="loading">Loading events…</p></main>
+  <p id="filterStatus" class="sr-only" role="status" aria-live="polite"></p>
+  <main id="list" class="list" role="tabpanel" aria-label="Events"><p class="loading">Loading events…</p></main>
 
-  <nav class="tabbar">
-    <button data-view="foryou" class="tab active">⭐<span>For You</span></button>
-    <button data-view="schedule" class="tab">🗓<span>Schedule</span></button>
-    <button data-view="favs" class="tab">❤️<span>Favs</span></button>
-    <button data-view="camps" class="tab">🏕<span>Camps</span></button>
+  <nav class="tabbar" role="tablist" aria-label="Views">
+    <button data-view="foryou" class="tab active" role="tab" aria-selected="true" aria-controls="list">⭐<span>For You</span></button>
+    <button data-view="schedule" class="tab" role="tab" aria-selected="false" aria-controls="list">🗓<span>Schedule</span></button>
+    <button data-view="favs" class="tab" role="tab" aria-selected="false" aria-controls="list">❤️<span>Favs</span></button>
+    <button data-view="camps" class="tab" role="tab" aria-selected="false" aria-controls="list">🏕<span>Camps</span></button>
   </nav>
+
+  <div id="modal" class="modal-backdrop" hidden>
+    <button id="modalClose" class="modal-close" aria-label="Close">×</button>
+    <div id="modalCard" class="modal-card" role="dialog" aria-modal="true" aria-label="Event details"></div>
+  </div>
 
   <script src="ics.js"></script>
   <script src="app.js"></script>

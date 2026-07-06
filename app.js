@@ -32,6 +32,7 @@
     likedOnly: false,
     hideAdult: false,
     sortByTime: false,
+    forceList: false,   // desktop: force card list instead of grid
     favs: new Set(),
     open: new Set(),
   };
@@ -48,6 +49,7 @@
       if (p.likedOnly) state.likedOnly = true;
       if (p.hideAdult) state.hideAdult = true;
       if (p.sortByTime) state.sortByTime = true;
+      if (p.forceList) state.forceList = true;
       if (p.view) state.view = p.view;
     } catch (e) {}
   }
@@ -55,7 +57,8 @@
   function savePrefs() {
     localStorage.setItem(LS.prefs, JSON.stringify({
       forYouOnly: state.forYouOnly, likedOnly: state.likedOnly,
-      hideAdult: state.hideAdult, sortByTime: state.sortByTime, view: state.view,
+      hideAdult: state.hideAdult, sortByTime: state.sortByTime,
+      forceList: state.forceList, view: state.view,
     }));
   }
 
@@ -120,11 +123,14 @@
       ? '<div class="reason">⭐ ' + escapeHtml(e.reason) + "</div>" : "";
     var scoreBadge = (e.score >= 65)
       ? '<span class="score-badge">' + e.score + "</span>" : "";
+    var heartLabel = (fav ? "Remove favourite: " : "Add favourite: ") + e.title;
     return (
-      '<article class="card' + (open ? " open" : "") + '" data-id="' + e.id + '">' +
+      '<article class="card' + (open ? " open" : "") + '" data-id="' + e.id + '"' +
+        ' tabindex="0" aria-expanded="' + (open ? "true" : "false") + '">' +
         '<div class="card-top">' +
           '<h3 class="card-title">' + escapeHtml(e.title) + "</h3>" +
-          '<button class="heart' + (fav ? " on" : "") + '" data-fav="' + e.id + '" aria-label="Favourite">❤</button>' +
+          '<button class="heart' + (fav ? " on" : "") + '" data-fav="' + e.id +
+            '" aria-pressed="' + (fav ? "true" : "false") + '" aria-label="' + escapeHtml(heartLabel) + '">❤</button>' +
         "</div>" +
         '<div class="meta">' +
           '<span>🕑 ' + timeRange(e) + (durLabel(e.dur) ? " · " + durLabel(e.dur) : "") + "</span>" +
@@ -148,6 +154,19 @@
   function render() {
     var v = state.view;
     var html = "";
+
+    // Desktop timetable grid for the Schedule view.
+    if (v === "schedule" && gridActive()) {
+      if (!state.day) { state.day = DAY_ORDER[0]; syncDayPills(); }
+      var gItems = state.events.filter(passesFilters);
+      listEl.className = "list grid-mode";
+      listEl.innerHTML = gridHTML(gItems);
+      fitGrid();
+      updateStatus(gItems);
+      return;
+    }
+    listEl.className = "list";
+
     var items = state.events.filter(passesFilters);
 
     if (v === "foryou") {
@@ -163,9 +182,96 @@
       html = groupByDay(items);
     }
     listEl.innerHTML = html;
+    updateStatus(items);
+  }
+
+  function updateStatus(items) {
+    var status = document.getElementById("filterStatus");
+    if (status) status.textContent = items.length + " events" +
+      (state.day ? " on " + DAY_LABEL[state.day] : "") +
+      (state.barrio ? " at " + state.barrio : "");
+  }
+
+  function syncDayPills() {
+    var pills = document.querySelectorAll("#dayPills .pill");
+    pills.forEach(function (p) {
+      p.classList.toggle("active", (p.getAttribute("data-day") || "") === (state.day || ""));
+    });
   }
 
   function emptyMsg(t) { return '<p class="empty">' + t + "</p>"; }
+
+  // ---------- desktop timetable grid ----------
+  var desktopMQ = window.matchMedia("(min-width: 1000px)");
+  function gridActive() { return desktopMQ.matches && state.view === "schedule" && !state.forceList; }
+
+  function gridHTML(items) {
+    // items are already filtered (incl. day + category). Grid shows one day.
+    var cats = Object.keys(CATS);
+    var visibleCats = state.cats.size ? cats.filter(function (c) { return state.cats.has(c); }) : cats;
+    // bucket by start-hour -> category
+    var grid = {}, hoursSet = {};
+    items.forEach(function (e) {
+      var h = parseInt(e.time.slice(0, 2), 10);
+      hoursSet[h] = true;
+      (grid[h] = grid[h] || {});
+      (grid[h][e.cat] = grid[h][e.cat] || []).push(e);
+    });
+    var hours = Object.keys(hoursSet).map(Number).sort(function (a, b) { return a - b; });
+    if (!hours.length) return '<div class="gridwrap">' + emptyMsg("No events for this day/filter.") + "</div>";
+
+    var cols = visibleCats.length;
+    var tpl = "3rem repeat(" + cols + ", minmax(0, 1fr))";
+    var html = '<div class="gridwrap"><div class="ggrid" style="grid-template-columns:' + tpl + '">';
+    // header row
+    html += '<div class="gcell gcorner gtime" style="top:0"></div>';
+    visibleCats.forEach(function (c) {
+      var m = CATS[c];
+      html += '<div class="gcell ghead" style="--c:' + m.color + '">' + m.emoji + " " + m.label + "</div>";
+    });
+    // body rows
+    hours.forEach(function (h) {
+      var hh = (h < 10 ? "0" : "") + h;
+      html += '<div class="gcell gtime">' + hh + "</div>";
+      visibleCats.forEach(function (c) {
+        var list = (grid[h] && grid[h][c]) || [];
+        list.sort(function (a, b) { return timeToMin(a.time) - timeToMin(b.time) || b.score - a.score; });
+        html += '<div class="gcell gbody">' + list.map(chipHTML).join("") + "</div>";
+      });
+    });
+    html += "</div></div>";
+    return html;
+  }
+
+  function chipHTML(e) {
+    var fav = state.favs.has(e.id);
+    var star = e.forYou ? '<span class="cst">★</span>' : "";
+    return '<button class="chip-ev' + (fav ? " fav on" : "") + '" data-chip="' + e.id + '" title="' +
+      escapeHtml(e.title + " — " + (e.camp || "") + " · " + timeRange(e)) + '">' +
+      '<span class="cet">' + e.time + "</span>" + star + escapeHtml(e.title) + "</button>";
+  }
+
+  function fitGrid() {
+    var wrap = listEl.querySelector(".gridwrap");
+    if (!wrap) return;
+    var tb = document.querySelector(".topbar");
+    var top = tb ? tb.getBoundingClientRect().height : 0;
+    var h = window.innerHeight - top - 58 /* tabbar */;
+    wrap.style.height = Math.max(200, h) + "px";
+  }
+
+  // ---------- detail modal (grid chip -> full card) ----------
+  function openModal(id) {
+    var e = state.events.filter(function (x) { return x.id === id; })[0];
+    if (!e) return;
+    state.open.add(e.id);
+    document.getElementById("modalCard").innerHTML = cardHTML(e);
+    var m = document.getElementById("modal");
+    m.hidden = false;
+    var close = document.getElementById("modalClose");
+    if (close) close.focus();
+  }
+  function closeModal() { document.getElementById("modal").hidden = true; }
 
   function groupByDay(items) {
     // Expand each event under each day it runs (respecting an active day filter).
@@ -237,7 +343,11 @@
     });
 
     var search = document.getElementById("search");
-    search.addEventListener("input", function () { state.search = search.value.trim(); render(); });
+    var searchT;
+    search.addEventListener("input", function () {
+      clearTimeout(searchT);
+      searchT = setTimeout(function () { state.search = search.value.trim(); render(); }, 180);
+    });
 
     var barrio = document.getElementById("barrio");
     barrio.addEventListener("change", function () { state.barrio = barrio.value; render(); });
@@ -276,8 +386,13 @@
     }
     function activate(view) {
       state.view = view; savePrefs();
-      tabs.forEach(function (t) { t.classList.toggle("active", t.getAttribute("data-view") === view); });
+      tabs.forEach(function (t) {
+        var on = t.getAttribute("data-view") === view;
+        t.classList.toggle("active", on);
+        t.setAttribute("aria-selected", on ? "true" : "false");
+      });
       syncSortToggle();
+      if (typeof syncLayoutToggle === "function") syncLayoutToggle();
       window.scrollTo(0, 0);
       render();
     }
@@ -292,23 +407,37 @@
   // ---------- card interactions (event delegation) ----------
   function bindList() {
     listEl.addEventListener("click", function (ev) {
+      var chip = ev.target.closest("[data-chip]");
+      if (chip) { openModal(chip.getAttribute("data-chip")); return; }
       var favBtn = ev.target.closest("[data-fav]");
       if (favBtn) {
         ev.stopPropagation();
         var id = favBtn.getAttribute("data-fav");
         if (state.favs.has(id)) state.favs.delete(id); else state.favs.add(id);
         saveFavs();
-        favBtn.classList.toggle("on");
-        if (state.view === "favs") render();
+        var nowFav = state.favs.has(id);
+        favBtn.classList.toggle("on", nowFav);
+        favBtn.setAttribute("aria-pressed", nowFav ? "true" : "false");
+        if (state.view === "favs" || state.likedOnly) render();
         return;
       }
       var card = ev.target.closest(".card");
-      if (card) {
-        var cid = card.getAttribute("data-id");
-        if (state.open.has(cid)) { state.open.delete(cid); card.classList.remove("open"); }
-        else { state.open.add(cid); card.classList.add("open"); }
+      if (card) toggleCard(card);
+    });
+    // Keyboard: Enter/Space expands the focused card.
+    listEl.addEventListener("keydown", function (ev) {
+      if (ev.target.classList && ev.target.classList.contains("card") &&
+          (ev.key === "Enter" || ev.key === " ")) {
+        ev.preventDefault();
+        toggleCard(ev.target);
       }
     });
+  }
+
+  function toggleCard(card) {
+    var cid = card.getAttribute("data-id");
+    if (state.open.has(cid)) { state.open.delete(cid); card.classList.remove("open"); card.setAttribute("aria-expanded", "false"); }
+    else { state.open.add(cid); card.classList.add("open"); card.setAttribute("aria-expanded", "true"); }
   }
 
   // ---------- export ----------
@@ -321,6 +450,47 @@
     });
   }
 
+  // ---------- chrome: modal, layout toggle, responsive ----------
+  function syncLayoutToggle() {
+    var btn = document.getElementById("layoutToggle");
+    if (!btn) return;
+    // Only relevant on desktop while on the Schedule view.
+    var show = desktopMQ.matches && state.view === "schedule";
+    btn.hidden = !show;
+    btn.textContent = state.forceList ? "▦ Grid" : "☰ List";
+    btn.setAttribute("aria-pressed", state.forceList ? "false" : "true");
+  }
+
+  function bindChrome() {
+    var modal = document.getElementById("modal");
+    document.getElementById("modalClose").addEventListener("click", closeModal);
+    modal.addEventListener("click", function (ev) { if (ev.target === modal) closeModal(); });
+    // favourite from inside the modal
+    document.getElementById("modalCard").addEventListener("click", function (ev) {
+      var favBtn = ev.target.closest("[data-fav]");
+      if (!favBtn) return;
+      var id = favBtn.getAttribute("data-fav");
+      if (state.favs.has(id)) state.favs.delete(id); else state.favs.add(id);
+      saveFavs();
+      var nowFav = state.favs.has(id);
+      favBtn.classList.toggle("on", nowFav);
+      favBtn.setAttribute("aria-pressed", nowFav ? "true" : "false");
+      render();
+    });
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape" && !modal.hidden) closeModal();
+    });
+
+    var toggle = document.getElementById("layoutToggle");
+    if (toggle) toggle.addEventListener("click", function () {
+      state.forceList = !state.forceList; savePrefs(); syncLayoutToggle(); render();
+    });
+
+    desktopMQ.addEventListener("change", function () { syncLayoutToggle(); render(); });
+    window.addEventListener("resize", function () { if (gridActive()) fitGrid(); });
+    syncLayoutToggle();
+  }
+
   // ---------- boot ----------
   function boot() {
     loadPrefs();
@@ -328,6 +498,7 @@
     buildTabs();
     bindList();
     bindExport();
+    bindChrome();
     fetch("events.json")
       .then(function (r) { return r.json(); })
       .then(function (data) {
