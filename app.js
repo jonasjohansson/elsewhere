@@ -104,7 +104,7 @@
 
   function catTag(cat) {
     var c = CATS[cat] || CATS.other;
-    return '<span class="tag" style="--tagc:' + c.color + '"><span class="tdot"></span>' + c.label + "</span>";
+    return '<span class="tag" style="--tagc:' + c.color + '">' + c.label + "</span>";
   }
 
   function cardHTML(e) {
@@ -239,7 +239,7 @@
 
   function chipHTML(e) {
     var fav = state.favs.has(e.id);
-    return '<button class="chip-ev' + (fav ? " fav" : "") + '" data-chip="' + e.id + '" title="' +
+    return '<button class="chip-ev cat-' + e.cat + (fav ? " fav" : "") + '" data-chip="' + e.id + '" title="' +
       escapeHtml(e.title + " — " + (e.camp || "") + " · " + timeRange(e)) + '">' +
       '<span class="cet">' + e.time + "</span>" + escapeHtml(e.title) + "</button>";
   }

@@ -1,5 +1,5 @@
 /* WWW '26 service worker — precache the app shell + data for full offline use. */
-var CACHE = "www26-v9";
+var CACHE = "www26-v10";
 var ASSETS = [
   "./", "index.html", "style.css", "app.js", "ics.js",
   "events.json", "manifest.webmanifest", "fonts/Inter-latin.woff2",

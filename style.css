@@ -41,6 +41,10 @@
   --r-md: 8px;
   --r-lg: 12px;
 
+  /* per-category light tint strength (used via color-mix on --evc / --tagc) */
+  --tint: 24%;
+  --tint-strong: 40%;
+
   /* spacing scale */
   --sp-1: 4px;
   --sp-2: 6px;
@@ -166,10 +170,10 @@ body {
 .meta .camp { color: var(--text); font-weight: 400; }
 .tag {
   font-size: 10.5px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em;
-  color: var(--text); padding: 2px 7px; border-radius: var(--r-xs);
-  border: 1px solid var(--tagc, var(--border)); background: transparent;
+  color: var(--text); padding: 2px 8px; border-radius: var(--r-xs);
+  border: 1px solid color-mix(in srgb, var(--tagc, var(--border)) var(--tint-strong), var(--border));
+  background: color-mix(in srgb, var(--tagc, var(--border)) var(--tint), var(--card));
 }
-.tag .tdot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: var(--sp-1); vertical-align: middle; background: var(--tagc); }
 .days-line { font-size: var(--fs-sm); color: var(--muted); margin-top: var(--sp-1); }
 .desc { margin-top: var(--sp-3); font-size: 13.5px; color: var(--text); white-space: pre-wrap; display: none; line-height: 1.55; letter-spacing: var(--ls); }
 .card.open .desc { display: block; }
@@ -214,8 +218,9 @@ body {
 .tt-adlabel { flex: 0 0 40px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding-top: 3px; }
 .tt-adchips { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
 .tt-chip {
-  border: var(--line-strong); border-left: 3px solid var(--evc, var(--muted));
-  background: var(--card); border-radius: var(--r-xs); padding: 3px 7px; font-size: var(--fs-xs);
+  border: 1px solid color-mix(in srgb, var(--evc, var(--muted)) var(--tint-strong), var(--border));
+  background: color-mix(in srgb, var(--evc, var(--muted)) var(--tint), var(--card));
+  border-radius: var(--r-xs); padding: 3px 7px; font-size: var(--fs-xs);
   cursor: pointer; color: var(--text); font-family: inherit; white-space: nowrap;
 }
 .tt-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -228,12 +233,13 @@ body {
 }
 .tt-ev {
   position: absolute; overflow: hidden; box-sizing: border-box;
-  border: var(--line); border-left: 3px solid var(--evc, var(--muted));
-  background: var(--card); border-radius: var(--r-xs); padding: 2px var(--sp-1);
+  border: 1px solid color-mix(in srgb, var(--evc, var(--muted)) var(--tint-strong), var(--border));
+  background: color-mix(in srgb, var(--evc, var(--muted)) var(--tint), var(--card));
+  border-radius: var(--r-xs); padding: 2px var(--sp-1);
   font-size: var(--fs-xs); line-height: 1.2; text-align: left; cursor: pointer; color: var(--text);
   min-height: 16px; font-family: inherit;
 }
-.tt-ev.fav { box-shadow: inset 0 0 0 1px var(--heart); }
+.tt-ev.fav { box-shadow: inset 0 0 0 2px var(--heart); }
 .tt-et { font-family: var(--mono); font-weight: 600; color: var(--muted); margin-right: 3px; }
 
 /* ---------- Desktop timetable grid ---------- */
@@ -255,11 +261,13 @@ body {
   .gcorner { position: sticky; top: 0; left: 0; z-index: 6; background: var(--bg-alt); border-bottom: var(--line); }
   .gbody { background: var(--card); display: flex; flex-direction: column; gap: 3px; }
   .chip-ev {
-    display: block; width: 100%; text-align: left; border: var(--line); background: var(--bg);
+    display: block; width: 100%; text-align: left; font-weight: 300;
+    border: 1px solid color-mix(in srgb, var(--evc, var(--muted)) var(--tint-strong), var(--border));
+    background: color-mix(in srgb, var(--evc, var(--muted)) var(--tint), var(--card));
     color: var(--text); border-radius: var(--r-xs); padding: 3px 5px; font-size: var(--fs-xs); cursor: pointer;
-    line-height: 1.3; overflow: hidden; font-family: inherit; font-weight: 300;
+    line-height: 1.3; overflow: hidden; font-family: inherit;
   }
-  .chip-ev:hover { border-color: var(--border-strong); }
+  .chip-ev:hover { border-color: var(--evc, var(--border-strong)); }
   .chip-ev .cet { font-family: var(--mono); font-weight: 500; margin-right: var(--sp-1); color: var(--muted); }
   .chip-ev.fav .cet::after { content: " ♥"; color: var(--heart); }
   .list:not(.grid-mode) { max-width: 720px; }
