@@ -35,8 +35,6 @@
     forceList: false,   // desktop: force card list instead of grid
     favs: new Set(),
     open: new Set(),
-    mapSvg: null,       // null = loading, false = failed, string = loaded
-    mapZoom: 100,
   };
 
   // ---------- persistence ----------
@@ -52,7 +50,7 @@
       if (p.hideAdult) state.hideAdult = true;
       if (p.sortByTime) state.sortByTime = true;
       if (p.forceList) state.forceList = true;
-      if (p.view) state.view = p.view;
+      if (["foryou", "schedule", "favs", "camps"].indexOf(p.view) >= 0) state.view = p.view;
     } catch (e) {}
   }
   function saveFavs() { localStorage.setItem(LS.favs, JSON.stringify([].concat(Array.from(state.favs)))); }
@@ -82,6 +80,10 @@
     return dur + "m";
   }
   function timeToMin(t) { var p = t.split(":"); return (+p[0]) * 60 + (+p[1]); }
+  // A festival "day" runs 07:00 -> 06:59; events before 07:00 are late-night, sort last.
+  var DAY_START = 7 * 60;
+  function dayMin(t) { var m = timeToMin(t); return m < DAY_START ? m + 1440 : m; }
+  function dayHour(h) { return h < 7 ? h + 24 : h; }
   function firstDayIdx(e) {
     var min = 99;
     e.days.forEach(function (d) { var i = DAY_ORDER.indexOf(d); if (i >= 0 && i < min) min = i; });
@@ -90,7 +92,7 @@
   function byDayThenTime(a, b) {
     // If a single day is active, order is purely by time; else group by first day.
     if (!state.day) { var d = firstDayIdx(a) - firstDayIdx(b); if (d) return d; }
-    return timeToMin(a.time) - timeToMin(b.time) || b.score - a.score;
+    return dayMin(a.time) - dayMin(b.time) || b.score - a.score;
   }
 
   // ---------- filtering ----------
@@ -142,7 +144,9 @@
         "</div>" +
         '<div class="days-line">📅 ' + daysTxt + "</div>" +
         reason +
-        '<div class="desc">' + escapeHtml(e.desc || "No description.") + "</div>" +
+        '<div class="desc">' + escapeHtml(e.desc || "No description.") +
+          (gcalUrl(e) ? '<a class="gcal" href="' + gcalUrl(e) + '" target="_blank" rel="noopener">＋ Add to Google Calendar</a>' : "") +
+        "</div>" +
       "</article>"
     );
   }
@@ -156,16 +160,6 @@
   function render() {
     var v = state.view;
     var html = "";
-
-    // Map view — the festival "City" map, tap a barrio to filter.
-    if (v === "map") {
-      listEl.className = "list map-mode";
-      listEl.innerHTML = mapHTML();
-      wireMap();
-      var st = document.getElementById("filterStatus");
-      if (st) st.textContent = "Map of the city — tap a barrio to see its events";
-      return;
-    }
 
     // Desktop timetable grid for the Schedule view.
     if (v === "schedule" && gridActive()) {
@@ -183,11 +177,13 @@
 
     if (v === "foryou") {
       if (state.sortByTime) items.sort(byDayThenTime);
-      else items.sort(function (a, b) { return b.score - a.score || timeToMin(a.time) - timeToMin(b.time); });
+      else items.sort(function (a, b) { return b.score - a.score || dayMin(a.time) - dayMin(b.time); });
       html = items.length ? items.map(cardHTML).join("") : emptyMsg("Nothing matches. Loosen the filters.");
     } else if (v === "favs") {
       var favItems = items.filter(function (e) { return state.favs.has(e.id); });
-      html = favItems.length ? groupByDay(favItems) : emptyMsg("No favourites yet. Tap ❤ on events you like — they’ll gather here, ready to export.");
+      var favBar = '<div class="favs-actions"><button class="ghost-btn" data-action="gcal">📅 Add liked + suggestions to Google Calendar</button></div>';
+      html = favBar + (favItems.length ? groupByDay(favItems)
+        : emptyMsg("No liked events yet. Tap ♡ on events you like — they gather here, ready to add to your calendar."));
     } else if (v === "camps") {
       html = groupByCamp(items);
     } else { // schedule
@@ -229,7 +225,7 @@
       (grid[h] = grid[h] || {});
       (grid[h][e.cat] = grid[h][e.cat] || []).push(e);
     });
-    var hours = Object.keys(hoursSet).map(Number).sort(function (a, b) { return a - b; });
+    var hours = Object.keys(hoursSet).map(Number).sort(function (a, b) { return dayHour(a) - dayHour(b); });
     if (!hours.length) return '<div class="gridwrap">' + emptyMsg("No events for this day/filter.") + "</div>";
 
     var cols = visibleCats.length;
@@ -247,7 +243,7 @@
       html += '<div class="gcell gtime">' + hh + "</div>";
       visibleCats.forEach(function (c) {
         var list = (grid[h] && grid[h][c]) || [];
-        list.sort(function (a, b) { return timeToMin(a.time) - timeToMin(b.time) || b.score - a.score; });
+        list.sort(function (a, b) { return dayMin(a.time) - dayMin(b.time) || b.score - a.score; });
         html += '<div class="gcell gbody">' + list.map(chipHTML).join("") + "</div>";
       });
     });
@@ -299,7 +295,7 @@
     DAY_ORDER.forEach(function (d) {
       var list = byDay[d];
       if (!list.length) return;
-      list.sort(function (a, b) { return timeToMin(a.time) - timeToMin(b.time) || b.score - a.score; });
+      list.sort(function (a, b) { return dayMin(a.time) - dayMin(b.time) || b.score - a.score; });
       var date = (state.meta.dayDates && state.meta.dayDates[d]) || "";
       var dateTxt = date ? " " + date.slice(8) + "/" + date.slice(5, 7) : "";
       out += '<div class="day-head">' + DAY_LABEL[d] + dateTxt + " · " + list.length + "</div>";
@@ -376,71 +372,6 @@
     sbt.addEventListener("change", function () { state.sortByTime = sbt.checked; savePrefs(); render(); });
   }
 
-  // ---------- map view ----------
-  function mapHTML() {
-    if (state.mapSvg === null) return '<div class="map-wrap"><p class="loading">Loading map…</p></div>';
-    if (state.mapSvg === false) return '<div class="map-wrap">' + emptyMsg("Map unavailable offline until first load.") + "</div>";
-    return (
-      '<div class="map-wrap">' +
-        '<div class="map-toolbar">' +
-          '<span class="map-hint">🗺 The City · tap a barrio</span>' +
-          '<div class="map-zoom">' +
-            '<button data-mz="out" aria-label="Zoom out">−</button>' +
-            '<button data-mz="in" aria-label="Zoom in">+</button>' +
-          "</div>" +
-        "</div>" +
-        '<div class="map-scroll"><div class="map-inner" style="width:' + state.mapZoom + '%">' +
-          state.mapSvg +
-        "</div></div>" +
-      "</div>"
-    );
-  }
-
-  function wireMap() {
-    var inner = listEl.querySelector(".map-inner");
-    if (!inner) return;
-    // Make barrio labels that match a real camp tappable -> filter to that barrio.
-    var camps = {};
-    state.events.forEach(function (e) { if (e.camp) camps[e.camp] = true; });
-    function gotoBarrio(name) {
-      state.barrio = name;
-      var sel = document.getElementById("barrio");
-      if (sel) sel.value = name;
-      state.view = "schedule"; savePrefs();
-      document.querySelectorAll(".tab").forEach(function (tb) {
-        var on = tb.getAttribute("data-view") === "schedule";
-        tb.classList.toggle("active", on); tb.setAttribute("aria-selected", on ? "true" : "false");
-      });
-      if (typeof syncSortToggle === "function") syncSortToggle();
-      if (typeof syncLayoutToggle === "function") syncLayoutToggle();
-      window.scrollTo(0, 0);
-      render();
-    }
-    inner.querySelectorAll("text").forEach(function (t) {
-      var name = (t.textContent || "").trim();
-      if (!camps[name]) return;
-      t.classList.add("map-barrio");
-      t.style.cursor = "pointer";
-      t.style.pointerEvents = "all";          // whole text box clickable, not just glyphs
-      t.setAttribute("tabindex", "0");
-      t.setAttribute("role", "button");
-      t.setAttribute("aria-label", "See events at " + name);
-      t.addEventListener("click", function () { gotoBarrio(name); });
-      t.addEventListener("keydown", function (ev) {
-        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); gotoBarrio(name); }
-      });
-    });
-    // zoom buttons
-    var toolbar = listEl.querySelector(".map-zoom");
-    if (toolbar) toolbar.addEventListener("click", function (ev) {
-      var b = ev.target.closest("[data-mz]"); if (!b) return;
-      var dir = b.getAttribute("data-mz");
-      state.mapZoom = Math.max(100, Math.min(400, state.mapZoom + (dir === "in" ? 60 : -60)));
-      var el = listEl.querySelector(".map-inner");
-      if (el) el.style.width = state.mapZoom + "%";
-    });
-  }
-
   // ---------- barrio dropdown ----------
   function populateBarrios() {
     var sel = document.getElementById("barrio");
@@ -484,6 +415,9 @@
   // ---------- card interactions (event delegation) ----------
   function bindList() {
     listEl.addEventListener("click", function (ev) {
+      if (ev.target.closest("a.gcal")) return; // let the Google Calendar link open
+      var sync = ev.target.closest('[data-action="gcal"]');
+      if (sync) { syncGoogleCalendar(); return; }
       var chip = ev.target.closest("[data-chip]");
       if (chip) { openModal(chip.getAttribute("data-chip")); return; }
       var favBtn = ev.target.closest("[data-fav]");
@@ -519,13 +453,34 @@
   }
 
   // ---------- export ----------
-  function bindExport() {
-    document.getElementById("exportBtn").addEventListener("click", function () {
-      if (!window.WWWICS) return;
-      var picked = window.WWWICS.selectForExport(state.events, state.favs);
-      if (!picked.length) { alert("Nothing to export yet. Favourite a few events (❤) — your favourites plus your top AI picks will be exported."); return; }
-      window.WWWICS.download(picked, state.meta);
-    });
+  // Bulk: favourites + top AI picks -> .ics (importable into Google Calendar).
+  function syncGoogleCalendar() {
+    if (!window.WWWICS) return;
+    var picked = window.WWWICS.selectForExport(state.events, state.favs);
+    if (!picked.length) { alert("Heart a few events first — your liked events plus your top suggestions will be added to your calendar."); return; }
+    window.WWWICS.download(picked, state.meta);
+  }
+
+  // Single event -> Google Calendar "add event" link (first day it runs).
+  function gcalUrl(e) {
+    var dayDates = (state.meta && state.meta.dayDates) || {};
+    var day = DAY_ORDER.filter(function (d) { return e.days.indexOf(d) >= 0; })[0];
+    var date = dayDates[day];
+    if (!date) return "";
+    function p(n) { return (n < 10 ? "0" : "") + n; }
+    var d = date.split("-").map(Number), t = e.time.split(":").map(Number);
+    var start = new Date(d[0], d[1] - 1, d[2], t[0], t[1], 0);
+    var end = new Date(start.getTime() + (e.dur || 60) * 60000);
+    function fmt(x) { return "" + x.getFullYear() + p(x.getMonth() + 1) + p(x.getDate()) + "T" + p(x.getHours()) + p(x.getMinutes()) + "00"; }
+    var params = [
+      "action=TEMPLATE",
+      "text=" + encodeURIComponent(e.title),
+      "dates=" + fmt(start) + "/" + fmt(end),
+      "details=" + encodeURIComponent((e.reason ? "★ " + e.reason + "\n\n" : "") + (e.desc || "")),
+      "location=" + encodeURIComponent([e.camp, e.loc].filter(Boolean).join(" — ")),
+      "ctz=Europe/Madrid",
+    ];
+    return "https://calendar.google.com/calendar/render?" + params.join("&");
   }
 
   // ---------- chrome: modal, layout toggle, responsive ----------
@@ -576,7 +531,6 @@
     buildFilterUI();
     buildTabs();
     bindList();
-    bindExport();
     bindChrome();
     fetch("events.json")
       .then(function (r) { return r.json(); })
@@ -589,11 +543,6 @@
       .catch(function (e) {
         listEl.innerHTML = emptyMsg("Couldn’t load events. " + e.message);
       });
-    // Map SVG loads independently (never masks an events-load error).
-    fetch("map.svg")
-      .then(function (r) { return r.ok ? r.text() : Promise.reject(); })
-      .then(function (svg) { state.mapSvg = svg; if (state.view === "map") render(); })
-      .catch(function () { state.mapSvg = false; if (state.view === "map") render(); });
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);

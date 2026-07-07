@@ -17,14 +17,8 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="topbar-row">
-      <h1>What Where <span>When</span></h1>
-      <div class="topbar-actions">
-        <button id="layoutToggle" class="ghost-btn" title="Switch between list and grid" aria-label="Switch between list and grid layout" hidden>▦ Grid</button>
-        <button id="exportBtn" class="ghost-btn" title="Export favourites + top picks to calendar" aria-label="Export favourites and top picks to calendar">📅 Export</button>
-      </div>
-    </div>
     <div id="filters" class="filters" role="search">
+      <button id="layoutToggle" class="ghost-btn" title="Switch between list and grid" aria-label="Switch between list and grid layout" hidden>▦ Grid</button>
       <input id="search" type="search" placeholder="Search events, camps…" autocomplete="off" />
       <select id="barrio" class="barrio-select" aria-label="Filter by barrio / camp">
         <option value="">🏕 All barrios</option>
@@ -32,10 +26,10 @@
       <div id="dayPills" class="pills" role="tablist" aria-label="Day"></div>
       <div id="catChips" class="chips" aria-label="Categories"></div>
       <div class="toggles">
-        <label class="toggle"><input type="checkbox" id="forYouOnly" /> ⭐ For You only</label>
-        <label class="toggle"><input type="checkbox" id="likedOnly" /> ❤️ Liked only</label>
+        <label class="toggle"><input type="checkbox" id="forYouOnly" /> ⭐ For You</label>
+        <label class="toggle"><input type="checkbox" id="likedOnly" /> ❤️ Liked</label>
         <label class="toggle"><input type="checkbox" id="hideAdult" /> 🙈 Hide adult</label>
-        <label class="toggle" id="sortByTimeWrap"><input type="checkbox" id="sortByTime" /> 🕑 Sort by time</label>
+        <label class="toggle" id="sortByTimeWrap"><input type="checkbox" id="sortByTime" /> 🕑 By time</label>
       </div>
     </div>
   </header>
@@ -46,7 +40,6 @@
   <nav class="tabbar" role="tablist" aria-label="Views">
     <button data-view="foryou" class="tab active" role="tab" aria-selected="true" aria-controls="list">⭐<span>For You</span></button>
     <button data-view="schedule" class="tab" role="tab" aria-selected="false" aria-controls="list">🗓<span>Schedule</span></button>
-    <button data-view="map" class="tab" role="tab" aria-selected="false" aria-controls="list">🗺<span>Map</span></button>
     <button data-view="favs" class="tab" role="tab" aria-selected="false" aria-controls="list">❤️<span>Favs</span></button>
     <button data-view="camps" class="tab" role="tab" aria-selected="false" aria-controls="list">🏕<span>Camps</span></button>
   </nav>
