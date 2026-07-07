@@ -2,21 +2,9 @@
 (function () {
   "use strict";
 
-  var TOP_PICKS = 30; // how many unseen high-scorers to include alongside favourites
-
   function selectForExport(events, favs) {
-    var byId = {};
-    events.forEach(function (e) { byId[e.id] = e; });
-    var picked = {};
-    // 1. all favourites
-    favs.forEach(function (id) { if (byId[id]) picked[id] = byId[id]; });
-    // 2. top unseen "For You" picks
-    events
-      .filter(function (e) { return e.forYou && !favs.has(e.id); })
-      .sort(function (a, b) { return b.score - a.score; })
-      .slice(0, TOP_PICKS)
-      .forEach(function (e) { picked[e.id] = e; });
-    return Object.keys(picked).map(function (id) { return picked[id]; });
+    // Liked (favourited) events only.
+    return events.filter(function (e) { return favs.has(e.id); });
   }
 
   function pad(n) { return (n < 10 ? "0" : "") + n; }

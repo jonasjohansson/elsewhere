@@ -23,16 +23,14 @@
   var state = {
     events: [],
     meta: {},
-    view: "foryou",
+    view: "schedule",
     search: "",
     day: null,          // null = all days
     barrio: "",         // "" = all barrios/camps
     cats: new Set(),    // empty = all categories
-    forYouOnly: false,
     likedOnly: false,
     hideAdult: false,
-    sortByTime: false,
-    forceList: false,   // desktop: force card list instead of grid
+    forceList: false,   // force card list instead of timetable
     favs: new Set(),
     open: new Set(),
   };
@@ -45,19 +43,16 @@
     } catch (e) {}
     try {
       var p = JSON.parse(localStorage.getItem(LS.prefs) || "{}");
-      if (p.forYouOnly) state.forYouOnly = true;
       if (p.likedOnly) state.likedOnly = true;
       if (p.hideAdult) state.hideAdult = true;
-      if (p.sortByTime) state.sortByTime = true;
       if (p.forceList) state.forceList = true;
-      if (["foryou", "schedule", "favs", "camps"].indexOf(p.view) >= 0) state.view = p.view;
+      if (["schedule", "favs", "camps"].indexOf(p.view) >= 0) state.view = p.view;
     } catch (e) {}
   }
   function saveFavs() { localStorage.setItem(LS.favs, JSON.stringify([].concat(Array.from(state.favs)))); }
   function savePrefs() {
     localStorage.setItem(LS.prefs, JSON.stringify({
-      forYouOnly: state.forYouOnly, likedOnly: state.likedOnly,
-      hideAdult: state.hideAdult, sortByTime: state.sortByTime,
+      likedOnly: state.likedOnly, hideAdult: state.hideAdult,
       forceList: state.forceList, view: state.view,
     }));
   }
@@ -89,16 +84,9 @@
     e.days.forEach(function (d) { var i = DAY_ORDER.indexOf(d); if (i >= 0 && i < min) min = i; });
     return min;
   }
-  function byDayThenTime(a, b) {
-    // If a single day is active, order is purely by time; else group by first day.
-    if (!state.day) { var d = firstDayIdx(a) - firstDayIdx(b); if (d) return d; }
-    return dayMin(a.time) - dayMin(b.time) || b.score - a.score;
-  }
-
   // ---------- filtering ----------
   function passesFilters(e) {
     if (state.hideAdult && e.cat === "adult") return false;
-    if (state.forYouOnly && !e.forYou) return false;
     if (state.likedOnly && !state.favs.has(e.id)) return false;
     if (state.barrio && e.camp !== state.barrio) return false;
     if (state.cats.size && !state.cats.has(e.cat)) return false;
@@ -123,15 +111,12 @@
     var fav = state.favs.has(e.id);
     var open = state.open.has(e.id);
     var daysTxt = e.days.length === 6 ? "Every day" : e.days.join(" · ");
-    var reason = e.reason
-      ? '<div class="reason"><span class="fystar">★</span> ' + escapeHtml(e.reason) + "</div>" : "";
-    var fyStar = e.forYou ? '<span class="fystar" title="Suggested for you">★</span>' : "";
     var heartLabel = (fav ? "Remove from liked: " : "Add to liked: ") + e.title;
     return (
-      '<article class="card' + (open ? " open" : "") + (e.forYou ? " foryou" : "") + '" data-id="' + e.id + '"' +
+      '<article class="card' + (open ? " open" : "") + '" data-id="' + e.id + '"' +
         ' tabindex="0" aria-expanded="' + (open ? "true" : "false") + '">' +
         '<div class="card-top">' +
-          '<h3 class="card-title">' + fyStar + escapeHtml(e.title) + "</h3>" +
+          '<h3 class="card-title">' + escapeHtml(e.title) + "</h3>" +
           '<button class="heart' + (fav ? " on" : "") + '" data-fav="' + e.id +
             '" aria-pressed="' + (fav ? "true" : "false") + '" aria-label="' + escapeHtml(heartLabel) + '">' +
             (fav ? "♥" : "♡") + "</button>" +
@@ -143,7 +128,6 @@
           catTag(e.cat) +
         "</div>" +
         '<div class="days-line">📅 ' + daysTxt + "</div>" +
-        reason +
         '<div class="desc">' + escapeHtml(e.desc || "No description.") +
           (gcalUrl(e) ? '<a class="gcal" href="' + gcalUrl(e) + '" target="_blank" rel="noopener">＋ Add to Google Calendar</a>' : "") +
         "</div>" +
@@ -175,13 +159,9 @@
 
     var items = state.events.filter(passesFilters);
 
-    if (v === "foryou") {
-      if (state.sortByTime) items.sort(byDayThenTime);
-      else items.sort(function (a, b) { return b.score - a.score || dayMin(a.time) - dayMin(b.time); });
-      html = items.length ? items.map(cardHTML).join("") : emptyMsg("Nothing matches. Loosen the filters.");
-    } else if (v === "favs") {
+    if (v === "favs") {
       var favItems = items.filter(function (e) { return state.favs.has(e.id); });
-      var favBar = '<div class="favs-actions"><button class="ghost-btn" data-action="gcal">📅 Add liked + suggestions to Google Calendar</button></div>';
+      var favBar = '<div class="favs-actions"><button class="ghost-btn" data-action="gcal">📅 Add liked to Google Calendar</button></div>';
       html = favBar + (favItems.length ? groupByDay(favItems)
         : emptyMsg("No liked events yet. Tap ♡ on events you like — they gather here, ready to add to your calendar."));
     } else if (v === "camps") {
@@ -253,10 +233,9 @@
 
   function chipHTML(e) {
     var fav = state.favs.has(e.id);
-    var star = e.forYou ? '<span class="cst">★</span>' : "";
-    return '<button class="chip-ev' + (fav ? " fav on" : "") + '" data-chip="' + e.id + '" title="' +
+    return '<button class="chip-ev' + (fav ? " fav" : "") + '" data-chip="' + e.id + '" title="' +
       escapeHtml(e.title + " — " + (e.camp || "") + " · " + timeRange(e)) + '">' +
-      '<span class="cet">' + e.time + "</span>" + star + escapeHtml(e.title) + "</button>";
+      '<span class="cet">' + e.time + "</span>" + escapeHtml(e.title) + "</button>";
   }
 
   function fitGrid() {
@@ -360,16 +339,11 @@
     var barrio = document.getElementById("barrio");
     barrio.addEventListener("change", function () { state.barrio = barrio.value; render(); });
 
-    var fyo = document.getElementById("forYouOnly");
     var lo = document.getElementById("likedOnly");
     var ha = document.getElementById("hideAdult");
-    var sbt = document.getElementById("sortByTime");
-    fyo.checked = state.forYouOnly; lo.checked = state.likedOnly;
-    ha.checked = state.hideAdult; sbt.checked = state.sortByTime;
-    fyo.addEventListener("change", function () { state.forYouOnly = fyo.checked; savePrefs(); render(); });
+    lo.checked = state.likedOnly; ha.checked = state.hideAdult;
     lo.addEventListener("change", function () { state.likedOnly = lo.checked; savePrefs(); render(); });
     ha.addEventListener("change", function () { state.hideAdult = ha.checked; savePrefs(); render(); });
-    sbt.addEventListener("change", function () { state.sortByTime = sbt.checked; savePrefs(); render(); });
   }
 
   // ---------- barrio dropdown ----------
@@ -388,10 +362,6 @@
   // ---------- tabs ----------
   function buildTabs() {
     var tabs = document.querySelectorAll(".tab");
-    var sortWrap = document.getElementById("sortByTimeWrap");
-    function syncSortToggle() {
-      if (sortWrap) sortWrap.style.display = state.view === "foryou" ? "" : "none";
-    }
     function activate(view) {
       state.view = view; savePrefs();
       tabs.forEach(function (t) {
@@ -399,7 +369,6 @@
         t.classList.toggle("active", on);
         t.setAttribute("aria-selected", on ? "true" : "false");
       });
-      syncSortToggle();
       if (typeof syncLayoutToggle === "function") syncLayoutToggle();
       window.scrollTo(0, 0);
       render();
@@ -409,7 +378,6 @@
       if (t.getAttribute("data-view") === state.view) t.classList.add("active");
       else t.classList.remove("active");
     });
-    syncSortToggle();
   }
 
   // ---------- card interactions (event delegation) ----------
@@ -476,7 +444,7 @@
       "action=TEMPLATE",
       "text=" + encodeURIComponent(e.title),
       "dates=" + fmt(start) + "/" + fmt(end),
-      "details=" + encodeURIComponent((e.reason ? "★ " + e.reason + "\n\n" : "") + (e.desc || "")),
+      "details=" + encodeURIComponent(e.desc || ""),
       "location=" + encodeURIComponent([e.camp, e.loc].filter(Boolean).join(" — ")),
       "ctz=Europe/Madrid",
     ];

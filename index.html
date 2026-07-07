@@ -26,10 +26,8 @@
       <div id="dayPills" class="pills" role="tablist" aria-label="Day"></div>
       <div id="catChips" class="chips" aria-label="Categories"></div>
       <div class="toggles">
-        <label class="toggle"><input type="checkbox" id="forYouOnly" /> ⭐ For You</label>
-        <label class="toggle"><input type="checkbox" id="likedOnly" /> ❤️ Liked</label>
+        <label class="toggle"><input type="checkbox" id="likedOnly" /> ❤️ Liked only</label>
         <label class="toggle"><input type="checkbox" id="hideAdult" /> 🙈 Hide adult</label>
-        <label class="toggle" id="sortByTimeWrap"><input type="checkbox" id="sortByTime" /> 🕑 By time</label>
       </div>
     </div>
   </header>
@@ -38,9 +36,8 @@
   <main id="list" class="list" role="tabpanel" aria-label="Events"><p class="loading">Loading events…</p></main>
 
   <nav class="tabbar" role="tablist" aria-label="Views">
-    <button data-view="foryou" class="tab active" role="tab" aria-selected="true" aria-controls="list">⭐<span>For You</span></button>
-    <button data-view="schedule" class="tab" role="tab" aria-selected="false" aria-controls="list">🗓<span>Schedule</span></button>
-    <button data-view="favs" class="tab" role="tab" aria-selected="false" aria-controls="list">❤️<span>Favs</span></button>
+    <button data-view="schedule" class="tab active" role="tab" aria-selected="true" aria-controls="list">🗓<span>Schedule</span></button>
+    <button data-view="favs" class="tab" role="tab" aria-selected="false" aria-controls="list">❤️<span>Liked</span></button>
     <button data-view="camps" class="tab" role="tab" aria-selected="false" aria-controls="list">🏕<span>Camps</span></button>
   </nav>
 
