@@ -91,6 +91,22 @@
   }
   function isPast(e, day) { var end = occEnd(e, day); return end != null && end < Date.now(); }
   function isPastAll(e) { return e.days.every(function (d) { return isPast(e, d); }); }
+
+  // Which festival day "now" falls in, and its position on the day timeline
+  // (dm in dayMin units: 07:00 = 420). null if outside the festival.
+  function nowInfo() {
+    var dd = state.meta.dayDates; if (!dd) return null;
+    var now = Date.now();
+    for (var i = 0; i < DAY_ORDER.length; i++) {
+      var ds = dd[DAY_ORDER[i]]; if (!ds) continue;
+      var p = ds.split("-").map(Number);
+      var start = new Date(p[0], p[1] - 1, p[2], 7, 0, 0).getTime();
+      if (now >= start && now < start + 86400000) {
+        return { day: DAY_ORDER[i], dm: 420 + Math.round((now - start) / 60000) };
+      }
+    }
+    return null;
+  }
   function firstDayIdx(e) {
     var min = 99;
     e.days.forEach(function (d) { var i = DAY_ORDER.indexOf(d); if (i >= 0 && i < min) min = i; });
@@ -165,10 +181,22 @@
         listEl.className = "list grid-mode";
         listEl.innerHTML = gridHTML(gItems);
         fitGrid();
+        if (state._scrollToNow) {
+          var ni2 = nowInfo();
+          if (ni2 && ni2.day === state.day) {
+            var hs = ("0" + Math.floor((ni2.dm % 1440) / 60)).slice(-2);
+            listEl.querySelectorAll(".gtime").forEach(function (c) { if (c.textContent === hs) c.scrollIntoView({ block: "center" }); });
+          }
+        }
       } else {
         listEl.className = "list tt-mode";
         listEl.innerHTML = timetableHTML(gItems, state.day);
+        if (state._scrollToNow) {
+          var nl = listEl.querySelector(".tt-now");
+          if (nl) nl.scrollIntoView({ block: "center" });
+        }
       }
+      state._scrollToNow = false;
       updateStatus(gItems);
       return;
     }
@@ -329,6 +357,11 @@
     for (var h2 = minS; h2 <= maxE; h2 += 60) {
       html += '<div class="tt-hline" style="top:' + ((h2 - minS) * TT_PPM) + 'px;left:' + GUT + 'px;width:' + (canvasW - GUT) + 'px"></div>';
     }
+    // "now" line (only when viewing the current festival day)
+    var ni = nowInfo();
+    if (ni && ni.day === day && ni.dm >= minS && ni.dm <= maxE) {
+      html += '<div class="tt-now" style="top:' + ((ni.dm - minS) * TT_PPM) + 'px;left:' + (GUT - 4) + 'px;width:' + (canvasW - GUT + 4) + 'px"><span class="tt-now-dot"></span></div>';
+    }
     // event blocks (one fixed column each)
     timed.forEach(function (x) {
       var e = x.e;
@@ -414,6 +447,7 @@
     dayPills.addEventListener("click", function (ev) {
       var b = ev.target.closest("[data-day]"); if (!b) return;
       state.day = b.getAttribute("data-day") || null;
+      state._scrollToNow = true;
       dayPills.querySelectorAll(".pill").forEach(function (p) { p.classList.remove("active"); });
       b.classList.add("active");
       if (typeof syncLayoutToggle === "function") syncLayoutToggle();

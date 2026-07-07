@@ -187,6 +187,10 @@ body {
 .card.past, .tt-ev.past, .tt-chip.past, .chip-ev.past { opacity: 0.42; }
 .card.past.open { opacity: 1; }  /* expanded past cards read at full strength */
 
+/* "now" line in the timetable */
+.tt-now { position: absolute; height: 0; border-top: 2px solid var(--accent); z-index: 5; pointer-events: none; }
+.tt-now-dot { position: absolute; left: 0; top: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+
 /* ---------- Tab bar ---------- */
 .tabbar {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
