@@ -178,10 +178,14 @@ body {
 .desc { margin-top: var(--sp-3); font-size: 13.5px; color: var(--text); white-space: pre-wrap; display: none; line-height: 1.55; letter-spacing: var(--ls); }
 .card.open .desc { display: block; }
 .desc .gcal {
-  display: inline-block; margin-top: var(--sp-4); color: var(--accent); font-weight: 500;
-  text-decoration: none; border: var(--line-strong); border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-4); letter-spacing: var(--ls);
+  display: block; width: fit-content; margin-top: var(--sp-4); color: var(--accent); font-weight: 500;
+  text-decoration: none; border: var(--line-strong); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-4); letter-spacing: var(--ls);
 }
 .desc .gcal:hover { border-color: var(--accent); }
+
+/* past events — dimmed */
+.card.past, .tt-ev.past, .tt-chip.past, .chip-ev.past { opacity: 0.42; }
+.card.past.open { opacity: 1; }  /* expanded past cards read at full strength */
 
 /* ---------- Tab bar ---------- */
 .tabbar {

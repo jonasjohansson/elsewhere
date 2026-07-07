@@ -79,6 +79,18 @@
   var DAY_START = 7 * 60;
   function dayMin(t) { var m = timeToMin(t); return m < DAY_START ? m + 1440 : m; }
   function dayHour(h) { return h < 7 ? h + 24 : h; }
+
+  // Real datetime of an event's occurrence on a given festival day (00:00–06:59
+  // belongs to the next calendar day, matching the 07:00 day boundary).
+  function occEnd(e, day) {
+    var ds = state.meta.dayDates && state.meta.dayDates[day];
+    if (!ds) return null;
+    var d = ds.split("-").map(Number), t = e.time.split(":").map(Number);
+    var off = timeToMin(e.time) < DAY_START ? 1 : 0;
+    return new Date(d[0], d[1] - 1, d[2] + off, t[0], t[1], 0).getTime() + (e.dur || 60) * 60000;
+  }
+  function isPast(e, day) { var end = occEnd(e, day); return end != null && end < Date.now(); }
+  function isPastAll(e) { return e.days.every(function (d) { return isPast(e, d); }); }
   function firstDayIdx(e) {
     var min = 99;
     e.days.forEach(function (d) { var i = DAY_ORDER.indexOf(d); if (i >= 0 && i < min) min = i; });
@@ -107,19 +119,19 @@
     return '<span class="tag" style="--tagc:' + c.color + '">' + c.label + "</span>";
   }
 
-  function cardHTML(e) {
+  function cardHTML(e, dayCtx) {
     var fav = state.favs.has(e.id);
     var open = state.open.has(e.id);
+    var past = dayCtx ? isPast(e, dayCtx) : isPastAll(e);
     var daysTxt = e.days.length === 6 ? "Every day" : e.days.join(" · ");
     var heartLabel = (fav ? "Remove from liked: " : "Add to liked: ") + e.title;
     return (
-      '<article class="card' + (open ? " open" : "") + '" data-id="' + e.id + '"' +
+      '<article class="card' + (open ? " open" : "") + (past ? " past" : "") + '" data-id="' + e.id + '"' +
         ' tabindex="0" aria-expanded="' + (open ? "true" : "false") + '">' +
         '<div class="card-top">' +
           '<h3 class="card-title">' + escapeHtml(e.title) + "</h3>" +
           '<button class="heart' + (fav ? " on" : "") + '" data-fav="' + e.id +
-            '" aria-pressed="' + (fav ? "true" : "false") + '" aria-label="' + escapeHtml(heartLabel) + '">' +
-            (fav ? "♥" : "♡") + "</button>" +
+            '" aria-pressed="' + (fav ? "true" : "false") + '" aria-label="' + escapeHtml(heartLabel) + '">♥</button>' +
         "</div>" +
         '<div class="meta">' +
           '<span>🕑 ' + timeRange(e) + (durLabel(e.dur) ? " · " + durLabel(e.dur) : "") + "</span>" +
@@ -145,10 +157,9 @@
     var v = state.view;
     var html = "";
 
-    // Schedule "timetable": desktop = category grid, mobile = collision day view.
-    // (Unless the user forces the plain list.)
-    if (v === "schedule" && !state.forceList) {
-      if (!state.day) { state.day = DAY_ORDER[0]; syncDayPills(); }
+    // Schedule "timetable" needs a single day: desktop = category grid,
+    // mobile = collision day view. "All days" (or forced list) shows the list.
+    if (v === "schedule" && !state.forceList && state.day) {
       var gItems = state.events.filter(passesFilters);
       if (desktopMQ.matches) {
         listEl.className = "list grid-mode";
@@ -197,7 +208,7 @@
 
   // ---------- desktop timetable grid ----------
   var desktopMQ = window.matchMedia("(min-width: 1000px)");
-  function gridActive() { return desktopMQ.matches && state.view === "schedule" && !state.forceList; }
+  function gridActive() { return desktopMQ.matches && state.view === "schedule" && !state.forceList && !!state.day; }
 
   function gridHTML(items) {
     // items are already filtered (incl. day + category). Grid shows one day.
@@ -230,16 +241,16 @@
       visibleCats.forEach(function (c) {
         var list = (grid[h] && grid[h][c]) || [];
         list.sort(function (a, b) { return dayMin(a.time) - dayMin(b.time) || b.score - a.score; });
-        html += '<div class="gcell gbody">' + list.map(chipHTML).join("") + "</div>";
+        html += '<div class="gcell gbody">' + list.map(function (e) { return chipHTML(e, state.day); }).join("") + "</div>";
       });
     });
     html += "</div></div>";
     return html;
   }
 
-  function chipHTML(e) {
-    var fav = state.favs.has(e.id);
-    return '<button class="chip-ev cat-' + e.cat + (fav ? " fav" : "") + '" data-chip="' + e.id + '" title="' +
+  function chipHTML(e, day) {
+    var fav = state.favs.has(e.id), past = day && isPast(e, day);
+    return '<button class="chip-ev cat-' + e.cat + (fav ? " fav" : "") + (past ? " past" : "") + '" data-chip="' + e.id + '" title="' +
       escapeHtml(e.title + " — " + (e.camp || "") + " · " + timeRange(e)) + '">' +
       '<span class="cet">' + e.time + "</span>" + escapeHtml(e.title) + "</button>";
   }
@@ -302,7 +313,7 @@
     if (longer.length) {
       html += '<div class="tt-allday"><span class="tt-adlabel">long / all&#8209;day</span><div class="tt-adchips">' +
         longer.map(function (e) {
-          return '<button class="tt-chip cat-' + e.cat + (state.favs.has(e.id) ? " fav" : "") + '" data-chip="' + e.id +
+          return '<button class="tt-chip cat-' + e.cat + (state.favs.has(e.id) ? " fav" : "") + (isPast(e, day) ? " past" : "") + '" data-chip="' + e.id +
             '"><span class="tt-et">' + e.time + "</span>" + escapeHtml(e.title) + "</button>";
         }).join("") + "</div></div>";
     }
@@ -324,7 +335,7 @@
       var top = (x.start - minS) * TT_PPM, ht = (x.end - x.start) * TT_PPM;
       var left = GUT + (x.col || 0) * COLW;
       var style = "top:" + top + "px;height:" + (ht - 1) + "px;left:" + left + "px;width:" + (COLW - GAP) + "px;";
-      html += '<button class="tt-ev cat-' + e.cat + (state.favs.has(e.id) ? " fav" : "") +
+      html += '<button class="tt-ev cat-' + e.cat + (state.favs.has(e.id) ? " fav" : "") + (isPast(e, day) ? " past" : "") +
         '" data-chip="' + e.id + '" style="' + style + '" title="' +
         escapeHtml(e.title + " · " + timeRange(e)) + '">' +
         '<span class="tt-et">' + e.time + "</span>" + escapeHtml(e.title) + "</button>";
@@ -364,7 +375,7 @@
       var date = (state.meta.dayDates && state.meta.dayDates[d]) || "";
       var dateTxt = date ? " " + date.slice(8) + "/" + date.slice(5, 7) : "";
       out += '<div class="day-head">' + DAY_LABEL[d] + dateTxt + " · " + list.length + "</div>";
-      out += list.map(cardHTML).join("");
+      out += list.map(function (e) { return cardHTML(e, d); }).join("");
     });
     return out || emptyMsg("Nothing matches. Loosen the filters.");
   }
@@ -405,6 +416,7 @@
       state.day = b.getAttribute("data-day") || null;
       dayPills.querySelectorAll(".pill").forEach(function (p) { p.classList.remove("active"); });
       b.classList.add("active");
+      if (typeof syncLayoutToggle === "function") syncLayoutToggle();
       render();
     });
     chips.addEventListener("click", function (ev) {
@@ -483,7 +495,6 @@
         var nowFav = state.favs.has(id);
         favBtn.classList.toggle("on", nowFav);
         favBtn.setAttribute("aria-pressed", nowFav ? "true" : "false");
-        favBtn.textContent = nowFav ? "♥" : "♡";
         if (state.view === "favs" || state.likedOnly) render();
         return;
       }
@@ -541,8 +552,8 @@
   function syncLayoutToggle() {
     var btn = document.getElementById("layoutToggle");
     if (!btn) return;
-    // Available on the Schedule view at all sizes: List <-> Timetable/Grid.
-    btn.hidden = state.view !== "schedule";
+    // Schedule + a specific day: offer List <-> Timetable/Grid. Hidden for "All days".
+    btn.hidden = !(state.view === "schedule" && state.day);
     btn.textContent = state.forceList
       ? "▦ " + (desktopMQ.matches ? "Grid" : "Timetable")
       : "☰ List";
@@ -563,7 +574,6 @@
       var nowFav = state.favs.has(id);
       favBtn.classList.toggle("on", nowFav);
       favBtn.setAttribute("aria-pressed", nowFav ? "true" : "false");
-      favBtn.textContent = nowFav ? "♥" : "♡";
       render();
     });
     document.addEventListener("keydown", function (ev) {
