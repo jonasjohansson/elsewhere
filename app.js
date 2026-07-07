@@ -145,13 +145,19 @@
     var v = state.view;
     var html = "";
 
-    // Desktop timetable grid for the Schedule view.
-    if (v === "schedule" && gridActive()) {
+    // Schedule "timetable": desktop = category grid, mobile = collision day view.
+    // (Unless the user forces the plain list.)
+    if (v === "schedule" && !state.forceList) {
       if (!state.day) { state.day = DAY_ORDER[0]; syncDayPills(); }
       var gItems = state.events.filter(passesFilters);
-      listEl.className = "list grid-mode";
-      listEl.innerHTML = gridHTML(gItems);
-      fitGrid();
+      if (desktopMQ.matches) {
+        listEl.className = "list grid-mode";
+        listEl.innerHTML = gridHTML(gItems);
+        fitGrid();
+      } else {
+        listEl.className = "list tt-mode";
+        listEl.innerHTML = timetableHTML(gItems, state.day);
+      }
       updateStatus(gItems);
       return;
     }
@@ -245,6 +251,86 @@
     var top = tb ? tb.getBoundingClientRect().height : 0;
     var h = window.innerHeight - top - 58 /* tabbar */;
     wrap.style.height = Math.max(200, h) + "px";
+  }
+
+  // ---------- mobile timetable (collision day view) ----------
+  var TT_PPM = 1.3;   // px per minute (vertical scale)
+  var TT_LONG = 240;  // dur >= 4h -> long/all-day strip, not the timed grid
+  // Greedy column packing per overlap-cluster so concurrent events sit side by side.
+  function packColumns(evs) {
+    var group = [], colsEnd = [];
+    function flush() {
+      var n = colsEnd.length;
+      group.forEach(function (x) { x.cols = n; });
+      group = []; colsEnd = [];
+    }
+    evs.forEach(function (x) {
+      if (colsEnd.length && x.start >= Math.max.apply(null, colsEnd)) flush();
+      var placed = -1;
+      for (var i = 0; i < colsEnd.length; i++) { if (colsEnd[i] <= x.start) { placed = i; break; } }
+      if (placed < 0) { placed = colsEnd.length; colsEnd.push(x.end); }
+      else colsEnd[placed] = x.end;
+      x.col = placed; group.push(x);
+    });
+    flush();
+  }
+
+  function timetableHTML(items, day) {
+    var evs = items.filter(function (e) { return e.days.indexOf(day) >= 0; });
+    var longer = [], timed = [];
+    evs.forEach(function (e) {
+      if ((e.dur || 60) >= TT_LONG) { longer.push(e); return; }
+      var s = dayMin(e.time);
+      timed.push({ e: e, start: s, end: s + Math.max(20, e.dur || 60) });
+    });
+    if (!timed.length && !longer.length) return emptyMsg("No events for this day/filter.");
+    longer.sort(function (a, b) { return dayMin(a.time) - dayMin(b.time); });
+    timed.sort(function (a, b) { return a.start - b.start || a.end - b.end; });
+    packColumns(timed);
+
+    var minS = timed.length ? timed[0].start : 7 * 60;
+    var maxE = timed.length ? Math.max.apply(null, timed.map(function (x) { return x.end; })) : 24 * 60;
+    minS = Math.floor(minS / 60) * 60; maxE = Math.ceil(maxE / 60) * 60;
+    // Fixed-width columns + horizontal scroll: concurrent events sit in adjacent
+    // columns (readable), sticky time gutter on the left keeps orientation.
+    var GUT = 42, COLW = 104, GAP = 3;
+    var maxCols = timed.reduce(function (m, x) { return Math.max(m, x.cols || 1); }, 1);
+    var canvasW = GUT + maxCols * COLW;
+    var H = (maxE - minS) * TT_PPM;
+
+    var html = "";
+    if (longer.length) {
+      html += '<div class="tt-allday"><span class="tt-adlabel">long / all&#8209;day</span><div class="tt-adchips">' +
+        longer.map(function (e) {
+          return '<button class="tt-chip cat-' + e.cat + (state.favs.has(e.id) ? " fav" : "") + '" data-chip="' + e.id +
+            '"><span class="tt-et">' + e.time + "</span>" + escapeHtml(e.title) + "</button>";
+        }).join("") + "</div></div>";
+    }
+    html += '<div class="tt-scroll"><div class="tt-canvas" style="width:' + canvasW + 'px;height:' + H + 'px">';
+    // sticky time gutter
+    html += '<div class="tt-gutter" style="height:' + H + 'px">';
+    for (var h = minS; h <= maxE; h += 60) {
+      var clock = Math.floor((h % 1440) / 60);
+      html += '<div class="tt-hlabel" style="top:' + ((h - minS) * TT_PPM) + 'px">' + (clock < 10 ? "0" : "") + clock + "</div>";
+    }
+    html += "</div>";
+    // hour lines across the canvas
+    for (var h2 = minS; h2 <= maxE; h2 += 60) {
+      html += '<div class="tt-hline" style="top:' + ((h2 - minS) * TT_PPM) + 'px;left:' + GUT + 'px;width:' + (canvasW - GUT) + 'px"></div>';
+    }
+    // event blocks (one fixed column each)
+    timed.forEach(function (x) {
+      var e = x.e;
+      var top = (x.start - minS) * TT_PPM, ht = (x.end - x.start) * TT_PPM;
+      var left = GUT + (x.col || 0) * COLW;
+      var style = "top:" + top + "px;height:" + (ht - 1) + "px;left:" + left + "px;width:" + (COLW - GAP) + "px;";
+      html += '<button class="tt-ev cat-' + e.cat + (state.favs.has(e.id) ? " fav" : "") +
+        '" data-chip="' + e.id + '" style="' + style + '" title="' +
+        escapeHtml(e.title + " · " + timeRange(e)) + '">' +
+        '<span class="tt-et">' + e.time + "</span>" + escapeHtml(e.title) + "</button>";
+    });
+    html += "</div></div>";
+    return html;
   }
 
   // ---------- detail modal (grid chip -> full card) ----------
@@ -455,10 +541,11 @@
   function syncLayoutToggle() {
     var btn = document.getElementById("layoutToggle");
     if (!btn) return;
-    // Only relevant on desktop while on the Schedule view.
-    var show = desktopMQ.matches && state.view === "schedule";
-    btn.hidden = !show;
-    btn.textContent = state.forceList ? "▦ Grid" : "☰ List";
+    // Available on the Schedule view at all sizes: List <-> Timetable/Grid.
+    btn.hidden = state.view !== "schedule";
+    btn.textContent = state.forceList
+      ? "▦ " + (desktopMQ.matches ? "Grid" : "Timetable")
+      : "☰ List";
     btn.setAttribute("aria-pressed", state.forceList ? "false" : "true");
   }
 
