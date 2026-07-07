@@ -1,5 +1,5 @@
 /* WWW '26 service worker — precache the app shell + data for full offline use. */
-var CACHE = "www26-v12";
+var CACHE = "www26-v13";
 var ASSETS = [
   "./", "index.html", "style.css", "app.js", "ics.js",
   "events.json", "manifest.webmanifest", "fonts/Inter-latin.woff2",
@@ -28,18 +28,18 @@ self.addEventListener("activate", function (e) {
 
 self.addEventListener("fetch", function (e) {
   if (e.request.method !== "GET") return;
+  if (e.request.url.indexOf(self.location.origin) !== 0) return; // let cross-origin pass through
+  // Network-first: always fresh when online, fall back to cache offline.
   e.respondWith(
-    caches.match(e.request).then(function (hit) {
-      if (hit) return hit;
-      return fetch(e.request).then(function (res) {
-        // Runtime-cache same-origin GETs (e.g. events.json refreshes).
-        if (res && res.status === 200 && e.request.url.indexOf(self.location.origin) === 0) {
-          var copy = res.clone();
-          caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
-        }
-        return res;
-      }).catch(function () {
-        return caches.match("index.html");
+    fetch(e.request).then(function (res) {
+      if (res && res.status === 200) {
+        var copy = res.clone();
+        caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
+      }
+      return res;
+    }).catch(function () {
+      return caches.match(e.request).then(function (hit) {
+        return hit || caches.match("index.html");
       });
     })
   );
