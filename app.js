@@ -276,11 +276,15 @@
     return html;
   }
 
+  function blkHeart(e) {
+    return '<span class="blk-heart' + (state.favs.has(e.id) ? " on" : "") + '" data-fav="' + e.id +
+      '" role="button" aria-label="Like ' + escapeHtml(e.title) + '">♥</span>';
+  }
   function chipHTML(e, day) {
     var fav = state.favs.has(e.id), past = day && isPast(e, day);
     return '<button class="chip-ev cat-' + e.cat + (fav ? " fav" : "") + (past ? " past" : "") + '" data-chip="' + e.id + '" title="' +
       escapeHtml(e.title + " — " + (e.camp || "") + " · " + timeRange(e)) + '">' +
-      '<span class="cet">' + e.time + "</span>" + escapeHtml(e.title) + "</button>";
+      '<span class="cet">' + e.time + "</span>" + escapeHtml(e.title) + blkHeart(e) + "</button>";
   }
 
   function fitGrid() {
@@ -342,7 +346,7 @@
       html += '<div class="tt-allday"><span class="tt-adlabel">long / all&#8209;day</span><div class="tt-adchips">' +
         longer.map(function (e) {
           return '<button class="tt-chip cat-' + e.cat + (state.favs.has(e.id) ? " fav" : "") + (isPast(e, day) ? " past" : "") + '" data-chip="' + e.id +
-            '"><span class="tt-et">' + e.time + "</span>" + escapeHtml(e.title) + "</button>";
+            '"><span class="tt-et">' + e.time + "</span>" + escapeHtml(e.title) + blkHeart(e) + "</button>";
         }).join("") + "</div></div>";
     }
     html += '<div class="tt-scroll"><div class="tt-canvas" style="width:' + canvasW + 'px;height:' + H + 'px">';
@@ -371,7 +375,7 @@
       html += '<button class="tt-ev cat-' + e.cat + (state.favs.has(e.id) ? " fav" : "") + (isPast(e, day) ? " past" : "") +
         '" data-chip="' + e.id + '" style="' + style + '" title="' +
         escapeHtml(e.title + " · " + timeRange(e)) + '">' +
-        '<span class="tt-et">' + e.time + "</span>" + escapeHtml(e.title) + "</button>";
+        '<span class="tt-et">' + e.time + "</span>" + escapeHtml(e.title) + blkHeart(e) + "</button>";
     });
     html += "</div></div>";
     return html;
@@ -518,20 +522,12 @@
       if (ev.target.closest("a.gcal")) return; // let the Google Calendar link open
       var sync = ev.target.closest('[data-action="gcal"]');
       if (sync) { syncGoogleCalendar(); return; }
+      // Like is checked BEFORE the block/chip so tapping a heart inside a block
+      // toggles the like instead of opening the detail.
+      var favBtn = ev.target.closest("[data-fav]");
+      if (favBtn) { ev.stopPropagation(); toggleFav(favBtn.getAttribute("data-fav")); return; }
       var chip = ev.target.closest("[data-chip]");
       if (chip) { openModal(chip.getAttribute("data-chip")); return; }
-      var favBtn = ev.target.closest("[data-fav]");
-      if (favBtn) {
-        ev.stopPropagation();
-        var id = favBtn.getAttribute("data-fav");
-        if (state.favs.has(id)) state.favs.delete(id); else state.favs.add(id);
-        saveFavs();
-        var nowFav = state.favs.has(id);
-        favBtn.classList.toggle("on", nowFav);
-        favBtn.setAttribute("aria-pressed", nowFav ? "true" : "false");
-        if (state.view === "favs" || state.likedOnly) render();
-        return;
-      }
       var card = ev.target.closest(".card");
       if (card) toggleCard(card);
     });
@@ -549,6 +545,32 @@
     var cid = card.getAttribute("data-id");
     if (state.open.has(cid)) { state.open.delete(cid); card.classList.remove("open"); card.setAttribute("aria-expanded", "false"); }
     else { state.open.add(cid); card.classList.add("open"); card.setAttribute("aria-expanded", "true"); }
+  }
+
+  // Re-render without losing the reader's place (vertical + timetable/grid horizontal).
+  function rerenderKeepScroll() {
+    var y = window.scrollY;
+    var sc = listEl.querySelector(".tt-scroll, .gridwrap");
+    var x = sc ? sc.scrollLeft : 0;
+    render();
+    window.scrollTo(0, y);
+    var sc2 = listEl.querySelector(".tt-scroll, .gridwrap");
+    if (sc2) sc2.scrollLeft = x;
+  }
+
+  // Toggle a like and update every on-screen reference in place (no scroll jump).
+  function toggleFav(id) {
+    if (state.favs.has(id)) state.favs.delete(id); else state.favs.add(id);
+    saveFavs();
+    var now = state.favs.has(id);
+    document.querySelectorAll('[data-fav="' + id + '"]').forEach(function (b) {
+      b.classList.toggle("on", now);
+      b.setAttribute("aria-pressed", now ? "true" : "false");
+      var block = b.closest(".tt-ev, .tt-chip, .chip-ev");
+      if (block) block.classList.toggle("fav", now);
+    });
+    // Views that filter/group by like need a rebuild (kept in place).
+    if (state.view === "favs" || state.likedOnly) rerenderKeepScroll();
   }
 
   // ---------- export ----------
@@ -598,17 +620,11 @@
     var modal = document.getElementById("modal");
     document.getElementById("modalClose").addEventListener("click", closeModal);
     modal.addEventListener("click", function (ev) { if (ev.target === modal) closeModal(); });
-    // favourite from inside the modal
+    // favourite from inside the modal (updates in place, keeps scroll)
     document.getElementById("modalCard").addEventListener("click", function (ev) {
       var favBtn = ev.target.closest("[data-fav]");
       if (!favBtn) return;
-      var id = favBtn.getAttribute("data-fav");
-      if (state.favs.has(id)) state.favs.delete(id); else state.favs.add(id);
-      saveFavs();
-      var nowFav = state.favs.has(id);
-      favBtn.classList.toggle("on", nowFav);
-      favBtn.setAttribute("aria-pressed", nowFav ? "true" : "false");
-      render();
+      toggleFav(favBtn.getAttribute("data-fav"));
     });
     document.addEventListener("keydown", function (ev) {
       if (ev.key === "Escape" && !modal.hidden) closeModal();
