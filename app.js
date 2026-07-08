@@ -172,6 +172,7 @@
   function render() {
     var v = state.view;
     var html = "";
+    listEl.style.height = "";  // only the mobile timetable sets an explicit height
 
     // Schedule "timetable" needs a single day: desktop = category grid,
     // mobile = collision day view. "All days" (or forced list) shows the list.
@@ -191,6 +192,7 @@
       } else {
         listEl.className = "list tt-mode";
         listEl.innerHTML = timetableHTML(gItems, state.day);
+        fitGrid();  // size the timetable box so it scrolls internally (both axes)
         if (state._scrollToNow) {
           var nl = listEl.querySelector(".tt-now");
           if (nl) nl.scrollIntoView({ block: "center" });
@@ -287,13 +289,15 @@
       '<span class="cet">' + e.time + "</span>" + escapeHtml(e.title) + blkHeart(e) + "</button>";
   }
 
+  // Size the schedule scroller to fill the viewport so it scrolls internally
+  // (both axes) — avoids the page-scroll trap of a nested overflow container.
   function fitGrid() {
-    var wrap = listEl.querySelector(".gridwrap");
-    if (!wrap) return;
     var tb = document.querySelector(".topbar");
     var top = tb ? tb.getBoundingClientRect().height : 0;
-    var h = window.innerHeight - top - 58 /* tabbar */;
-    wrap.style.height = Math.max(200, h) + "px";
+    var h = Math.max(220, window.innerHeight - top - 58 /* tabbar */);
+    var wrap = listEl.querySelector(".gridwrap");
+    if (wrap) wrap.style.height = h + "px";
+    else if (listEl.classList.contains("tt-mode")) listEl.style.height = h + "px";
   }
 
   // ---------- mobile timetable (collision day view) ----------
@@ -636,7 +640,9 @@
     });
 
     desktopMQ.addEventListener("change", function () { syncLayoutToggle(); render(); });
-    window.addEventListener("resize", function () { if (gridActive()) fitGrid(); });
+    window.addEventListener("resize", function () {
+      if (state.view === "schedule" && state.day && !state.forceList) fitGrid();
+    });
     syncLayoutToggle();
   }
 
